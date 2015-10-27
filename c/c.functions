@@ -1,0 +1,89 @@
+# This file is part of compile. It is subject to the licence terms in the COPYRIGHT file found in the top-level directory of this distribution and at https://raw.githubusercontent.com/shellfire-dev/compile/master/COPYRIGHT. No part of compile, including this file, may be copied, modified, propagated, or distributed except according to the terms contained in the COPYRIGHT file.
+# Copyright © 2015 The developers of compile. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/shellfire-dev/compile/master/COPYRIGHT.
+
+
+_compile_c_reset()
+{
+	local array="$1"
+
+	if core_variable_array_isSet "$array"; then
+		core_variable_array_unset "$array"
+	fi
+	core_variable_array_initialise "$array"
+}
+
+core_dependency_requires compile/c preprocess link
+compile_c_reset()
+{
+	_compile_c_reset compile_c_cFlags
+	compile_c_preprocess_reset
+	compile_c_link_reset
+}
+
+# These are used during preprocessing, compiling and linking
+# There are what are required, what we deduce and what the user can then override
+compile_c_addCFlags()
+{	
+	local cFlag
+	for cFlag in "$@"
+	do
+		core_variable_array_append compile_c_cFlags "$cFlag"
+	done
+}
+
+_compile_c_append_callback()
+{
+	core_variable_array_append commandLine "$@"
+}
+
+_compile_c_append()
+{
+	local array="$1"
+	
+	core_variable_array_passToFunctionAsArguments "$array" _compile_c_append_callback
+}
+
+# TODO: Additional system include paths using -isystem (I would argue that this should also be used for any dependent libraries, to prevent warnings)
+# Assumes the compiler is going to be run in a particular source folder (cwd)
+compile_c_preprocessAndCompile()
+{
+	local CC="$1" # eg gcc
+	local standard="$2" # eg  gnu90
+	shift 2
+	
+	local commandLine
+	local commandLine_initialised
+	core_variable_array_initialise commandLine
+	
+	core_variable_array_append commandLine "$CC" -std="$standard"
+	
+	_compile_c_append compile_c_preprocess_cPreprocessorFlags
+	_compile_c_append compile_c_preprocess_defines
+	_compile_c_append compile_c_cFlags
+	
+	local uniqueIncludePaths
+	local uniqueIncludePaths_initialised
+	core_variable_array_initialise uniqueIncludePaths
+
+	local sourceFileWithoutExtension
+	for sourceFileWithoutExtension in "$@"
+	do
+		# Find any and all paths
+		local path="$(core_compatibility_dirname "$sourceFileWithoutExtension")"
+		core_variable_array_appendUniquely uniqueIncludePaths -I"$path"
+	done
+	
+	_compile_c_append uniqueIncludePaths
+	
+	# Stop linking
+	core_variable_array_append commandLine -c
+	
+	for sourceFileWithoutExtension in "$@"
+	do
+		core_variable_array_append commandLine "$sourceFileWithoutExtension".c
+	done
+	
+	core_variable_array_passToFunctionAsArguments commandLine compile_escapedCommandLine
+	
+	compile_c_preprocess_reset
+}

@@ -2,7 +2,8 @@
 # Copyright © 2015 The developers of sample. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/pallene/sample/master/COPYRIGHT.
 
 
-core_usesIn compile
+core_usesIn compile c
+core_usesIn compile/c preprocess link
 compile_recipes_make()
 {
 	local CC='gcc'
@@ -26,21 +27,21 @@ compile_recipes_make()
 	
 	# We may need to add extra source files, eg for alloca, in legacy platforms
 	
-	compile_CPreprocessAndCompile_reset
+	compile_c_preprocess_reset
 	
-	compile_CPreprocessAndCompile_addCFlags '-g' '-O2'
+	compile_c_addCFlags '-g' '-O2'
 	
-	compile_CPreprocessAndCompile_addCPreprocessorFlags
-	compile_CPreprocessAndCompile_addStringDefines \
+	compile_c_preprocess_addCPreprocessorFlags
+	compile_c_preprocess_addStringDefines \
 		LOCALEDIR "$localedir" \
 		LIBDIR "$libdir" \
 		INCLUDEDIR "$includedir"
-	compile_CPreprocessAndCompile_addEmptyDefines HAVE_CONFIG_H
-	compile_CPreprocessAndCompile "$CC" 'gnu90' "$@"
+	compile_c_preprocess_addEmptyDefines HAVE_CONFIG_H
+	compile_c_preprocessAndCompile "$CC" 'gnu90' "$@"
 	
-	compile_CPreprocessAndCompile_addLinkerFlags '-rdynamic'
-	compile_CPreprocessAndCompile_addLinkedLibrary
-	compile_linkExecutableUsingCCompiler "$CC" make "$@"
+	compile_c_link_addLinkerFlags '-rdynamic'
+	compile_c_link_addLinkedLibrary
+	compile_c_link "$CC" make "$@"
 }
 
 core_dependency_requires '*' cat
