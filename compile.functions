@@ -1,0 +1,242 @@
+# This file is part of compile. It is subject to the licence terms in the COPYRIGHT file found in the top-level directory of this distribution and at https://raw.githubusercontent.com/shellfire-dev/compile/master/COPYRIGHT. No part of compile, including this file, may be copied, modified, propagated, or distributed except according to the terms contained in the COPYRIGHT file.
+# Copyright © 2015 The developers of compile. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/shellfire-dev/compile/master/COPYRIGHT.
+
+
+core_usesIn cpucount
+core_dependency_requires 'Homebrew' brew
+compile_initialiase()
+{
+	local TMP_FILE
+	core_temporaryFiles_newFileToRemoveOnExit
+	_compile_temporaryBuildScript="$TMP_FILE"
+	
+	cpucount_computeMakeJobsAndLoadAverage 0 10
+	
+	# Problem: Mac OS X compilation is borked; need to use brew sh
+	if core_compatibility_whichNoOutput brew; then
+		_compile_useHomebrew=true
+	else
+		_compile_useHomebrew=false
+	fi
+}
+
+core_dependency_requires '*' sh
+core_dependency_requires 'Homebrew' cat
+compile_executionScript()
+{
+	local sourcePath="$1"
+	local destinationPath="$2"
+	local commandFunction="$3"
+	
+	if $_compile_useHomebrew; then
+		cat >"$_compile_temporaryBuildScript" <<-EOF
+			set -e
+			set -u
+			set -f
+			cd $(core_variable_escapeSingleQuotes "$sourcePath")
+		EOF
+	
+		$commandFunction >>"$_compile_temporaryBuildScript"
+		
+		printf '%s\n' "sh '$(core_variable_escapeSingleQuotes "$_compile_temporaryBuildScript")'" | brew sh
+	else
+		pushd "$sourcePath"
+		
+			$commandFunction
+			
+		popd
+	fi
+}
+
+compile_escapedCommandLine()
+{
+	if ! $_compile_useHomebrew; then
+		"$@"
+		return 0
+	fi
+	
+	local afterFirst=false
+	local argument
+	for argument in "$@"
+	do
+		if $afterFirst; then
+			printf ' '
+		else
+			afterFirst=true
+		fi
+		printf "'"
+		core_variable_escapeSingleQuotes "$argument"
+		printf "'"
+	done
+}
+
+# Note: We are now able to bootstrap make
+core_dependency_requires '*' make
+compile_escapedCommandLineMake()
+{
+	core_variable_escapedCommandLine make -l $cpucount_makeLoadAverage -j $cpucount_makeJobs "$@"
+}
+
+compile_CPreprocessAndCompile_reset()
+{
+	local array
+	for array in compile_CPreprocessAndCompile_cPreprocessorFlags compile_CPreprocessAndCompile_defines compile_CPreprocessAndCompile_cFlags compile_CPreprocessAndCompile_linkerFlags compile_CPreprocessAndCompile_linkedLibraries
+	do
+		if core_variable_array_isSet "$array"; then
+			core_variable_array_unset "$array"
+			core_variable_array_initialise "$array"
+		fi
+	done
+}
+
+# These are used during preprocessing
+# There are what are required, what we deduce and what the user can then override
+compile_CPreprocessAndCompile_addCPreprocessorFlags()
+{	
+	local cPreprocessorFlag
+	for cPreprocessorFlag in "$@"
+	do
+		core_variable_array_append compile_CPreprocessAndCompile_cPreprocessorFlags "$cPreprocessorFlag"
+	done
+}
+
+# These are used during preprocessing
+# There are what are required, what we deduce and what the user can then override
+compile_CPreprocessAndCompile_addDefines()
+{
+	local definitionKey
+	local definitionValue
+	while [ $# -ne 0 ]
+	do
+		definitionKey="$1"
+		definitionValue="$2"
+		core_variable_array_append compile_CPreprocessAndCompile_defines -D"$definitionKey"="$definitionValue"
+		shift 2
+	done
+}
+
+compile_CPreprocessAndCompile_addEmptyDefine()
+{
+	local definitionKey
+	for definitionKey in "$@"
+	do
+		core_variable_array_append compile_CPreprocessAndCompile_defines -D"$definitionKey"
+	done
+}
+
+# TODO: Assembler flags, start -Wa,
+
+# These are used during preprocessing, compiling and linking
+# There are what are required, what we deduce and what the user can then override
+compile_CPreprocessAndCompile_addCFlags()
+{	
+	local cFlag
+	for cFlag in "$@"
+	do
+		core_variable_array_append compile_CPreprocessAndCompile_cFlags "$cFlag"
+	done
+}
+
+# These are used during linking, but, because they are passed by the c compiler front end, they start -Wl,
+# There are what are required, what we deduce and what the user can then override
+compile_CPreprocessAndCompile_addLinkerFlags()
+{	
+	local linkedFlag
+	for linkedFlag in "$@"
+	do
+		core_variable_array_append compile_CPreprocessAndCompile_linkerFlags "$linkedFlag"
+	done
+}
+
+# LOADLIBES == '@LIBS@ @GUILE_LIBS@ @LIBINTL@'
+# Need to add support for -L<dir> so we can find linked libraries!
+# These are used during linking, but, because they are passed by the c compiler front end, they are turned into -llib<LIB>.a
+# There are what are required, what we deduce and what the user can then override
+compile_CPreprocessAndCompile_addLinkedLibrary()
+{	
+	local linkedLibrary
+	for linkedLibrary in "$@"
+	do
+		core_variable_array_append compile_CPreprocessAndCompile_linkedLibraries "$linkedLibrary"
+	done
+}
+
+# TODO: Additional system include paths using -isystem (I would argue that this should also be used for any dependent libraries, to prevent warnings)
+# Assumes the compiler is going to be run in a particular source folder (cwd)
+compile_CPreprocessAndCompile()
+{
+	local CC="$1" # eg gcc
+	local standard="$2" # eg  gnu90
+	
+	_compile_CPreprocessAndCompile_callback()
+	{
+		core_variable_array_append commandLine "$@"
+	}
+	
+	local commandLine
+	local commandLine_initialised
+	core_variable_array_initialise commandLine
+	
+	core_variable_array_append commandLine "$CC" -std "$standard"
+	
+	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_cPreprocessorFlags _compile_CPreprocessAndCompile_callback
+
+	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_defines _compile_CPreprocessAndCompile_callback
+	
+	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_cFlags _compile_CPreprocessAndCompile_callback
+	
+	local uniqueIncludePaths
+	local uniqueIncludePaths_initialised
+	core_variable_array_initialise uniqueIncludePaths
+
+	local sourceFileWithoutExtension
+	for sourceFileWithoutExtension in "$@"
+	do
+		# Find any and all paths
+		local path="$(core_compatibility_dirname "$sourceFileWithoutExtension")"
+		core_variable_array_appendUniquely uniqueIncludePaths -I"$path"
+	done
+	
+	core_variable_array_passToFunctionAsArguments uniqueIncludePaths _compile_CPreprocessAndCompile_callback
+	
+	# Stop linking
+	core_variable_array_append commandLine -c
+	
+	for sourceFileWithoutExtension in "$@"
+	do
+		core_variable_array_append commandLine "$sourceFileWithoutExtension".c
+	done
+	
+	core_variable_array_passToFunctionAsArguments commandLine compile_escapedCommandLine
+}
+
+compile_linkExecutableUsingCCompiler()
+{
+	local CC="$1" # eg gcc
+	local executableName="$2" # eg make
+	
+	# In reality, these are per-system
+	local objectExtension='.o'
+	local executableExtension='' # eg .exe
+	
+	local commandLine
+	local commandLine_initialised
+	core_variable_array_initialise commandLine
+	
+	core_variable_array_append commandLine "$CC"
+	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_cFlags _compile_CPreprocessAndCompile_callback
+	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_linkerFlags _compile_CPreprocessAndCompile_callback
+	
+	local sourceFileWithoutExtension
+	for sourceFileWithoutExtension in "$@"
+	do
+		local compiledObjectIsInRootSourceFolder="$(core_compatibility_dirname "$sourceFileWithoutExtension")"
+		core_variable_array_append commandLine "${compiledObjectIsInRootSourceFolder}${objectExtension}"
+	done
+
+	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_linkedLibraries _compile_CPreprocessAndCompile_callback
+	
+	core_variable_array_append commandLine -o "${executableName}${executableExtension}"
+	
+	core_variable_array_passToFunctionAsArguments commandLine compile_escapedCommandLine
+}

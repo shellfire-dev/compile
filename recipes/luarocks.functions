@@ -1,0 +1,13 @@
+# This file is part of sample. It is subject to the licence terms in the COPYRIGHT file found in the top-level directory of this distribution and at https://raw.githubusercontent.com/pallene/sample/master/COPYRIGHT. No part of sample, including this file, may be copied, modified, propagated, or distributed except according to the terms contained in the COPYRIGHT file.
+# Copyright © 2015 The developers of sample. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/pallene/sample/master/COPYRIGHT.
+
+
+core_usesIn compile
+compile_recipes_luarocks()
+{
+	# --with-downloader=curl
+	# --with-md5-checker=md5sum
+	compile_escapedCommandLineMake ./configure --prefix="$destinationPath" --sysconfdir="$destinationPath"/etc --rocks-tree="$destinationPath"/lib/luarocks \
+		--scripts-dir="$destinationPath"/lib/luarocks/bin --lua-suffix='' --lua-version='5.2' --with-lua=XXXX_PATH --with-lua-include=XXX --with-lua-lib=XXX --force-config
+	compile_escapedCommandLineMake bootstrap
+}
