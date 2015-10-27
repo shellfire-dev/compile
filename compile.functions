@@ -28,6 +28,8 @@ compile_executionScript()
 	local destinationPath="$2"
 	local commandFunction="$3"
 	
+	compile_c_reset
+	
 	if $_compile_useHomebrew; then
 		cat >"$_compile_temporaryBuildScript" <<-EOF
 			set -e
@@ -37,7 +39,7 @@ compile_executionScript()
 		EOF
 	
 		$commandFunction >>"$_compile_temporaryBuildScript"
-		cat "$_compile_temporaryBuildScript" 1>&2
+		
 		printf '%s\n' "sh '$(core_variable_escapeSingleQuotes "$_compile_temporaryBuildScript")'" | brew sh
 	else
 		pushd "$sourcePath"
