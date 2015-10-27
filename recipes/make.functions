@@ -15,7 +15,7 @@ compile_recipes_make()
 	local includedir="$destinationPath"/include
 	local localedir="$destinationPath"/share/locale
 	
-	compile_recipes_make_configH_macosx >'config.h'
+	compile_recipes_make_configH_macosx >"$sourcePath"/config.h
 	
 	# Source files
 	set -- ar arscan commands default dir expand file function getopt getopt1 guile implicit job load loadapi main misc output read remake rule signame strcache variable version vpath hash "remote-$REMOTE"
@@ -30,12 +30,12 @@ compile_recipes_make()
 	
 	compile_CPreprocessAndCompile_addCFlags '-g' '-O2'
 	
-	compile_CPreprocessAndCompile_cPreprocessorFlags
-	compile_CPreprocessAndCompile_addDefines \
+	compile_CPreprocessAndCompile_addCPreprocessorFlags
+	compile_CPreprocessAndCompile_addStringDefines \
 		LOCALEDIR "$localedir" \
 		LIBDIR "$libdir" \
 		INCLUDEDIR "$includedir"
-	compile_CPreprocessAndCompile_addEmptyDefine HAVE_CONFIG_H
+	compile_CPreprocessAndCompile_addEmptyDefines HAVE_CONFIG_H
 	compile_CPreprocessAndCompile "$CC" 'gnu90' "$@"
 	
 	compile_CPreprocessAndCompile_addLinkerFlags '-rdynamic'
@@ -46,7 +46,7 @@ compile_recipes_make()
 core_dependency_requires '*' cat
 compile_recipes_make_configH_macosx()
 {
-	cat <<-EOF
+	cat <<-'EOF'
 	/* config.h.  Generated from config.h.in by configure.  */
 	/* config.h.in.  Generated from configure.ac by autoheader.  */
 

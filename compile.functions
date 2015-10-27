@@ -86,8 +86,8 @@ compile_CPreprocessAndCompile_reset()
 	do
 		if core_variable_array_isSet "$array"; then
 			core_variable_array_unset "$array"
-			core_variable_array_initialise "$array"
 		fi
+		core_variable_array_initialise "$array"
 	done
 }
 
@@ -117,7 +117,20 @@ compile_CPreprocessAndCompile_addDefines()
 	done
 }
 
-compile_CPreprocessAndCompile_addEmptyDefine()
+compile_CPreprocessAndCompile_addStringDefines()
+{
+	local definitionKey
+	local definitionValue
+	while [ $# -ne 0 ]
+	do
+		definitionKey="$1"
+		definitionValue="$2"
+		compile_CPreprocessAndCompile_addDefines "$definitionKey" "\"$definitionValue\""
+		shift 2
+	done
+}
+
+compile_CPreprocessAndCompile_addEmptyDefines()
 {
 	local definitionKey
 	for definitionKey in "$@"
@@ -169,6 +182,7 @@ compile_CPreprocessAndCompile()
 {
 	local CC="$1" # eg gcc
 	local standard="$2" # eg  gnu90
+	shift 2
 	
 	_compile_CPreprocessAndCompile_callback()
 	{
@@ -179,7 +193,7 @@ compile_CPreprocessAndCompile()
 	local commandLine_initialised
 	core_variable_array_initialise commandLine
 	
-	core_variable_array_append commandLine "$CC" -std "$standard"
+	core_variable_array_append commandLine "$CC" -std="$standard"
 	
 	core_variable_array_passToFunctionAsArguments compile_CPreprocessAndCompile_cPreprocessorFlags _compile_CPreprocessAndCompile_callback
 
@@ -216,6 +230,7 @@ compile_linkExecutableUsingCCompiler()
 {
 	local CC="$1" # eg gcc
 	local executableName="$2" # eg make
+	shift 2
 	
 	# In reality, these are per-system
 	local objectExtension='.o'
@@ -232,7 +247,7 @@ compile_linkExecutableUsingCCompiler()
 	local sourceFileWithoutExtension
 	for sourceFileWithoutExtension in "$@"
 	do
-		local compiledObjectIsInRootSourceFolder="$(core_compatibility_dirname "$sourceFileWithoutExtension")"
+		local compiledObjectIsInRootSourceFolder="$(core_compatibility_basename "$sourceFileWithoutExtension")"
 		core_variable_array_append commandLine "${compiledObjectIsInRootSourceFolder}${objectExtension}"
 	done
 
