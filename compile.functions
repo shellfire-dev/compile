@@ -37,7 +37,7 @@ compile_executionScript()
 		EOF
 	
 		$commandFunction >>"$_compile_temporaryBuildScript"
-		
+		cat "$_compile_temporaryBuildScript" 1>&2
 		printf '%s\n' "sh '$(core_variable_escapeSingleQuotes "$_compile_temporaryBuildScript")'" | brew sh
 	else
 		pushd "$sourcePath"
@@ -68,6 +68,8 @@ compile_escapedCommandLine()
 		core_variable_escapeSingleQuotes "$argument"
 		printf "'"
 	done
+	
+	printf '\n'
 }
 
 # Note: We are now able to bootstrap make
